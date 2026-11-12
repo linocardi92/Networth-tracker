@@ -182,6 +182,7 @@
           <input type="password" id="scriptTokenInput" placeholder="Inserisci la password impostata nello script" />
         </div>
         <button class="btn btn-primary" onclick="saveSettings()">Salva URL e Sincronizza</button>
+<button class="btn btn-secondary" onclick="localStorage.removeItem('gas_url'); localStorage.removeItem('gas_token'); location.reload();">Disconnetti Foglio (Torna a Demo)</button>
       </div>
     </section>
   </main>
