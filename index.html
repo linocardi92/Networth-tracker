@@ -13,9 +13,10 @@
       --muted: #94a3b8; --accent: #38bdf8; --green: #34d399; --red: #f87171; --border: #334155;
     }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); padding-bottom: 84px; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); min-height: 100%; overflow-x: hidden; }
+    body { padding-bottom: 84px; }
     header {
-      position: sticky; top: 0; z-index: 20; background: rgba(15, 23, 42, 0.92);
+      position: sticky; top: 0; z-index: 20; background: rgba(15, 23, 42, 0.95);
       backdrop-filter: blur(8px); padding: 14px 18px; border-bottom: 1px solid var(--border);
       display: flex; justify-content: space-between; align-items: center;
     }
@@ -58,25 +59,24 @@
     .filters { display: flex; gap: 6px; margin-bottom: 10px; }
     .filters button { background: var(--card-alt); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; }
     .filters button.active { background: var(--accent); color: #0f172a; font-weight: 700; }
-    
-    /* Stili per la Schermata di Blocco */
+
     #lockScreen {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      position: fixed; inset: 0; width: 100%; height: 100dvh;
       background: var(--bg); z-index: 99999;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 20px; text-align: center;
     }
     #lockScreen.hidden { display: none !important; }
-    #unlockPin { text-align: center; font-size: 1.5rem; letter-spacing: 6px; margin-bottom: 16px; padding: 15px; }
+    #unlockPin { text-align: center; font-size: 1.5rem; letter-spacing: 6px; margin-bottom: 16px; padding: 15px; max-width: 280px; }
+    #lockScreen .btn { max-width: 280px; }
   </style>
 </head>
 <body>
-  <!-- SCHERMATA DI BLOCCO (LOCK SCREEN) -->
+  <!-- SCHERMATA DI BLOCCO -->
   <div id="lockScreen" class="hidden">
     <div style="font-size: 3.5rem; margin-bottom: 15px;">🔒</div>
     <h2 style="margin:0 0 8px 0; font-size:1.5rem;">App Bloccata</h2>
     <p class="kpi-sub" style="margin-bottom: 24px;">Autenticati per accedere al portafoglio</p>
-    
     <input type="password" id="unlockPin" placeholder="PIN" inputmode="numeric" />
     <button class="btn btn-primary" onclick="unlockWithPin()">Sblocca con PIN</button>
     <button class="btn btn-secondary" id="btnBioUnlock" onclick="unlockWithBio()" style="display: none; margin-top: 12px;">
@@ -84,12 +84,12 @@
     </button>
   </div>
 
-  <header>
+  <header id="appHeader">
     <h1>NetWorth Tracker</h1>
     <span class="badge" id="statusBadge">Modalità Demo</span>
   </header>
 
-  <main>
+  <main id="appMain">
     <!-- VISTA 1: ALLOCAZIONE & TARGET -->
     <section id="view-alloc" class="view active">
       <div class="card">
@@ -182,12 +182,12 @@
           <input type="password" id="scriptTokenInput" placeholder="Inserisci la password impostata nello script" />
         </div>
         <button class="btn btn-primary" onclick="saveSettings()">Salva URL e Sincronizza</button>
-<button class="btn btn-secondary" onclick="localStorage.removeItem('gas_url'); localStorage.removeItem('gas_token'); location.reload();">Disconnetti Foglio (Torna a Demo)</button>
+        <button class="btn btn-secondary" onclick="disconnectSheet()">Scollega Foglio Google</button>
       </div>
     </section>
   </main>
 
-  <nav>
+  <nav id="appNav">
     <button class="active" onclick="switchView('alloc', this)"><span class="ico">🍩</span>Allocazione</button>
     <button onclick="switchView('growth', this)"><span class="ico">📈</span>Crescita</button>
     <button onclick="switchView('entry', this)"><span class="ico">➕</span>Aggiorna</button>
@@ -203,24 +203,21 @@
 
     const fmtEUR = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n || 0);
 
-    // ==========================================
-    // SISTEMA DI SICUREZZA E AVVIO
-    // ==========================================
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. Gestione Blocco Schermo all'avvio
       const savedAppPin = localStorage.getItem('app_pin');
       const savedBioId = localStorage.getItem('app_bio_id');
-      
+
       if (savedAppPin) {
         document.getElementById('lockScreen').classList.remove('hidden');
+        document.getElementById('appHeader').style.display = 'none';
+        document.getElementById('appMain').style.display = 'none';
+        document.getElementById('appNav').style.display = 'none';
         if (savedBioId && window.PublicKeyCredential) {
           document.getElementById('btnBioUnlock').style.display = 'block';
-          // Tenta lo sblocco biometrico automatico dopo 400ms
           setTimeout(unlockWithBio, 400);
         }
       }
 
-      // 2. Inizializzazione dati
       const savedUrl = localStorage.getItem('gas_url') || '';
       const savedToken = localStorage.getItem('gas_token') || '';
       document.getElementById('scriptUrlInput').value = savedUrl;
@@ -254,22 +251,27 @@
       }
     });
 
-    // ==========================================
-    // FUNZIONI DI SICUREZZA (Lock Screen)
-    // ==========================================
+    function showUnlockedApp() {
+      document.getElementById('lockScreen').classList.add('hidden');
+      document.getElementById('appHeader').style.display = 'flex';
+      document.getElementById('appMain').style.display = 'block';
+      document.getElementById('appNav').style.display = 'grid';
+      window.scrollTo(0, 0);
+      setTimeout(() => {
+        if (appData.history.length) renderAll();
+      }, 60);
+    }
+
     async function enableAppLock() {
       const pin = document.getElementById('setupPinInput').value.trim();
       if (!pin) return alert("Inserisci un PIN per attivare il blocco.");
-      
       localStorage.setItem('app_pin', pin);
-      
-      // Controllo se il browser supporta le Passkey (WebAuthn) e se siamo in contesto sicuro (HTTPS)
+
       if (window.PublicKeyCredential && window.isSecureContext && window.location.hostname) {
         if (confirm("Vuoi attivare anche lo sblocco veloce con Impronta Digitale o Viso?")) {
           try {
             const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
             const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
-            
             const cred = await navigator.credentials.create({
               publicKey: {
                 challenge,
@@ -280,19 +282,17 @@
                 timeout: 60000
               }
             });
-            // Salviamo l'ID grezzo della credenziale generata dal sensore
             const rawIdB64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
             localStorage.setItem('app_bio_id', rawIdB64);
             alert("Protezione attivata con successo! (PIN + Impronta)");
           } catch (err) {
-            console.warn(err);
-            alert("Impronta non configurata (annullata o non supportata). È stato attivato solo il blocco tramite PIN.");
+            alert("Impronta non configurata. È stato attivato solo il blocco tramite PIN.");
           }
         } else {
           alert("Protezione tramite PIN attivata con successo.");
         }
       } else {
-        alert("Protezione tramite PIN attivata. (L'impronta richiede Chrome aggiornato e connessione sicura HTTPS).");
+        alert("Protezione tramite PIN attivata.");
       }
       document.getElementById('setupPinInput').value = '';
     }
@@ -300,15 +300,16 @@
     function disableAppLock() {
       localStorage.removeItem('app_pin');
       localStorage.removeItem('app_bio_id');
-      alert("Blocco di sicurezza disattivato. L'app si aprirà liberamente.");
+      alert("Blocco di sicurezza disattivato.");
     }
 
     function unlockWithPin() {
       const input = document.getElementById('unlockPin').value;
       const savedPin = localStorage.getItem('app_pin');
       if (input === savedPin) {
-        document.getElementById('lockScreen').classList.add('hidden');
-        document.getElementById('unlockPin').value = ''; // pulizia
+        document.getElementById('unlockPin').value = '';
+        document.getElementById('unlockPin').blur();
+        showUnlockedApp();
       } else {
         alert("PIN errato. Riprova.");
         document.getElementById('unlockPin').value = '';
@@ -318,14 +319,11 @@
     async function unlockWithBio() {
       const rawIdB64 = localStorage.getItem('app_bio_id');
       if (!rawIdB64) return;
-
       try {
         const rawIdStr = atob(rawIdB64);
         const rawId = new Uint8Array(rawIdStr.length);
-        for(let i = 0; i < rawIdStr.length; i++) rawId[i] = rawIdStr.charCodeAt(i);
-
+        for (let i = 0; i < rawIdStr.length; i++) rawId[i] = rawIdStr.charCodeAt(i);
         const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-
         await navigator.credentials.get({
           publicKey: {
             challenge,
@@ -334,35 +332,36 @@
             userVerification: "required"
           }
         });
-        
-        // Se arriva qui, l'impronta è corretta
-        document.getElementById('lockScreen').classList.add('hidden');
+        showUnlockedApp();
       } catch (err) {
-        console.warn("Biometria fallita o annullata dall'utente:", err);
-        // Silenzioso in caso di annullamento, l'utente può semplicemente inserire il PIN
+        console.warn("Biometria annullata:", err);
       }
     }
 
-    // ==========================================
-    // LOGICA APP (Identica a prima)
-    // ==========================================
     function switchView(name, btn) {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
       document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
       document.getElementById('view-' + name).classList.add('active');
       btn.classList.add('active');
+      window.scrollTo(0, 0);
     }
 
     function saveSettings() {
       const url = document.getElementById('scriptUrlInput').value.trim();
       const token = document.getElementById('scriptTokenInput').value.trim();
-      if (!url || !token) {
-        alert('Compila sia l\'URL dello script sia la Password del Database.');
-        return;
-      }
+      if (!url || !token) return alert('Compila sia l\'URL dello script sia la Password del Database.');
       localStorage.setItem('gas_url', url);
       localStorage.setItem('gas_token', token);
       fetchFromSheet(url, token);
+    }
+
+    function disconnectSheet() {
+      if (!confirm('Vuoi scollegare il foglio Google da questo dispositivo?')) return;
+      localStorage.removeItem('gas_url');
+      localStorage.removeItem('gas_token');
+      document.getElementById('scriptUrlInput').value = '';
+      document.getElementById('scriptTokenInput').value = '';
+      loadDemoData();
     }
 
     async function fetchFromSheet(url, token) {
@@ -377,7 +376,7 @@
         appData = json;
         badge.textContent = 'Connesso e Protetto';
         badge.style.color = '#34d399';
-        renderAll();
+        if (document.getElementById('appMain').style.display !== 'none') renderAll();
       } catch (err) {
         badge.textContent = 'Errore Accesso';
         badge.style.color = '#f87171';
@@ -409,7 +408,7 @@
           { category: 'Pensione integrativa', asset: 'Fondo Pensione', value: 8500 }
         ]
       };
-      renderAll();
+      if (document.getElementById('appMain').style.display !== 'none') renderAll();
     }
 
     function renderAll() {
@@ -549,587 +548,7 @@
       const url = localStorage.getItem('gas_url');
       const token = localStorage.getItem('gas_token');
       if (!url || !token) return alert('Inserisci sia l\'URL dello script sia la Password nella scheda "Impostazioni".');
-      
-      const month = document.getElementById('entryMonth').value;
-      const items = [];
-      document.querySelectorAll('.entry-row').forEach(row => {
-        const category = row.querySelector('.in-cat').value;
-        const asset = row.querySelector('.in-asset').value.trim();
-        const value = parseFloat(row.querySelector('.in-val').value);
-        if (asset && !isNaN(value)) items.push({ category, asset, value });
-      });
 
-      if (!month || !items.length) return alert('Compila il mese e almeno un asset.');
-      if (!confirm(`Confermi l'inserimento di ${items.length} righe per il mese ${month} nella scheda DATABASE?`)) return;
-
-      const btn = document.getElementById('saveBtn');
-      btn.disabled = true; btn.textContent = 'Salvataggio in corso...';
-
-      try {
-        const res = await fetch(url, { method: 'POST', body: JSON.stringify({ action: 'appendMonth', token: token, month: month, items: items }) });
-        const json = await res.json();
-        if (json.status !== 'ok') throw new Error(json.message);
-        alert(`Salvate ${json.inserted} righe con successo!`);
-        await fetchFromSheet(url, token);
-      } catch (err) {
-        alert('Errore durante il salvataggio: ' + err.message);
-      } finally {
-        btn.disabled = false; btn.textContent = 'Salva su Google Fogli';
-      }
-    }
-  </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>NetWorth Tracker</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0f172a" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <style>
-    :root {
-      --bg: #0f172a; --card: #1e293b; --card-alt: #273549; --text: #f8fafc;
-      --muted: #94a3b8; --accent: #38bdf8; --green: #34d399; --red: #f87171; --border: #334155;
-    }
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); padding-bottom: 84px; }
-    header {
-      position: sticky; top: 0; z-index: 20; background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(8px); padding: 14px 18px; border-bottom: 1px solid var(--border);
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    header h1 { margin: 0; font-size: 1.1rem; font-weight: 700; }
-    .badge { font-size: 0.75rem; background: var(--card-alt); color: var(--accent); padding: 4px 10px; border-radius: 99px; }
-    main { max-width: 720px; margin: 0 auto; padding: 16px; }
-    .view { display: none; }
-    .view.active { display: block; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
-    .card h2 { margin: 0 0 12px 0; font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    .kpi-big { font-size: 1.9rem; font-weight: 800; margin: 4px 0; }
-    .kpi-sub { font-size: 0.85rem; color: var(--muted); }
-    .chart-box { position: relative; height: 270px; width: 100%; }
-    .cat-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-    .cat-item { background: var(--card-alt); border-radius: 12px; padding: 11px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    .cat-left { display: flex; align-items: center; gap: 10px; }
-    .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
-    .asset-drill { background: #162032; border-radius: 10px; padding: 10px 14px; margin-top: 6px; font-size: 0.85rem; display: none; }
-    .asset-drill.open { display: block; }
-    .asset-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .asset-row:last-child { border-bottom: none; }
-    .rebal-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-    .input-group label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
-    input, select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 0.95rem; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-    th, td { padding: 9px 6px; text-align: right; border-bottom: 1px solid var(--border); }
-    th:first-child, td:first-child { text-align: left; }
-    .pos { color: var(--green); font-weight: 600; }
-    .neg { color: var(--red); font-weight: 600; }
-    .entry-row { display: grid; grid-template-columns: 1.1fr 1.2fr 1fr 34px; gap: 6px; align-items: center; margin-bottom: 8px; }
-    .entry-row input, .entry-row select { padding: 8px 9px; font-size: 0.86rem; }
-    .btn-del { background: rgba(248, 113, 113, 0.15); color: var(--red); border: none; border-radius: 8px; height: 36px; font-weight: bold; cursor: pointer; }
-    .btn { width: 100%; padding: 13px; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
-    .btn-primary { background: var(--accent); color: #0f172a; }
-    .btn-secondary { background: var(--card-alt); color: var(--text); }
-    nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr); height: 68px; z-index: 30; }
-    nav button { background: none; border: none; color: var(--muted); font-size: 0.72rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
-    nav button.active { color: var(--accent); font-weight: 700; }
-    nav span.ico { font-size: 1.25rem; }
-    .filters { display: flex; gap: 6px; margin-bottom: 10px; }
-    .filters button { background: var(--card-alt); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; }
-    .filters button.active { background: var(--accent); color: #0f172a; font-weight: 700; }
-    
-    /* Stili per la Schermata di Blocco */
-    #lockScreen {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: var(--bg); z-index: 99999;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 20px; text-align: center;
-    }
-    #lockScreen.hidden { display: none !important; }
-    #unlockPin { text-align: center; font-size: 1.5rem; letter-spacing: 6px; margin-bottom: 16px; padding: 15px; }
-  </style>
-</head>
-<body>
-  <!-- SCHERMATA DI BLOCCO (LOCK SCREEN) -->
-  <div id="lockScreen" class="hidden">
-    <div style="font-size: 3.5rem; margin-bottom: 15px;">🔒</div>
-    <h2 style="margin:0 0 8px 0; font-size:1.5rem;">App Bloccata</h2>
-    <p class="kpi-sub" style="margin-bottom: 24px;">Autenticati per accedere al portafoglio</p>
-    
-    <input type="password" id="unlockPin" placeholder="PIN" inputmode="numeric" />
-    <button class="btn btn-primary" onclick="unlockWithPin()">Sblocca con PIN</button>
-    <button class="btn btn-secondary" id="btnBioUnlock" onclick="unlockWithBio()" style="display: none; margin-top: 12px;">
-      👆 Sblocca con Impronta
-    </button>
-  </div>
-
-  <header>
-    <h1>NetWorth Tracker</h1>
-    <span class="badge" id="statusBadge">Modalità Demo</span>
-  </header>
-
-  <main>
-    <!-- VISTA 1: ALLOCAZIONE & TARGET -->
-    <section id="view-alloc" class="view active">
-      <div class="card">
-        <h2>Patrimonio Totale (<span id="latestMonthLabel">-</span>)</h2>
-        <div class="kpi-big" id="totalNetWorth">€ 0,00</div>
-        <div class="kpi-sub" id="momDelta">Variazione mese precedente: -</div>
-        <div class="chart-box" style="margin-top:14px;"><canvas id="donutChart"></canvas></div>
-        <div class="kpi-sub" style="text-align:center; margin-top:8px;">Tocca una categoria per vedere i singoli asset</div>
-        <div class="cat-list" id="categoryBreakdown"></div>
-      </div>
-
-      <div class="card">
-        <h2>Ribilanciamento Portafoglio Investito</h2>
-        <div class="rebal-controls">
-          <div class="input-group">
-            <label>Target Azionario (ETF) %</label>
-            <input type="number" id="targetEq" min="0" max="100" step="1" value="70" />
-          </div>
-          <div class="input-group">
-            <label>Target Obbligazionario %</label>
-            <input type="number" id="targetBond" min="0" max="100" step="1" value="30" />
-          </div>
-        </div>
-        <table>
-          <thead><tr><th>Macroarea</th><th>Attuale</th><th>Target</th><th>Delta €</th></tr></thead>
-          <tbody id="rebalanceTable"></tbody>
-        </table>
-        <div class="kpi-sub" style="margin-top:8px;">*Obbligazionario include: Bond + Buoni postali + Fondi (esclusi Liquidità e Pensione integrativa).</div>
-      </div>
-    </section>
-
-    <!-- VISTA 2: CRESCITA STORICA -->
-    <section id="view-growth" class="view">
-      <div class="card">
-        <h2>Crescita Patrimonio nel Tempo</h2>
-        <div class="filters">
-          <button class="active" onclick="setRange('ALL', this)">Tutto</button>
-          <button onclick="setRange('36', this)">3 Anni</button>
-          <button onclick="setRange('12', this)">12 Mesi</button>
-        </div>
-        <div class="chart-box" style="height:310px;"><canvas id="lineChart"></canvas></div>
-      </div>
-      <div class="card" style="overflow-x:auto;">
-        <h2>Storico Mensile Aggregato</h2>
-        <table>
-          <thead><tr><th>Mese</th><th>ETF</th><th>Bond/Buoni/Fondi</th><th>Liquidità</th><th>Pensione</th><th>Totale</th></tr></thead>
-          <tbody id="historyTable"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- VISTA 3: NUOVO INSERIMENTO MENSILE -->
-    <section id="view-entry" class="view">
-      <div class="card">
-        <h2>Nuovo Aggiornamento Mensile</h2>
-        <div class="input-group" style="margin-bottom:12px;">
-          <label>Mese di riferimento</label>
-          <input type="month" id="entryMonth" />
-        </div>
-        <div id="entryRows"></div>
-        <button class="btn btn-secondary" onclick="addEntryRow()">+ Aggiungi Nuovo Asset</button>
-        <div style="margin-top:14px; display:flex; justify-content:space-between; font-weight:700;">
-          <span>Nuovo Totale Stimato:</span><span id="entryPreviewTotal">€ 0,00</span>
-        </div>
-        <button class="btn btn-primary" id="saveBtn" onclick="saveMonthToSheet()">Salva su Google Fogli</button>
-      </div>
-    </section>
-
-    <!-- VISTA 4: IMPOSTAZIONI & SICUREZZA -->
-    <section id="view-settings" class="view">
-      <div class="card">
-        <h2>Sicurezza App (Locale)</h2>
-        <p class="kpi-sub" style="margin-bottom:12px;">Blocca l'app con PIN o impronta digitale in caso di furto dello smartphone.</p>
-        <div class="input-group">
-          <label>Nuovo PIN di Sblocco</label>
-          <input type="password" id="setupPinInput" placeholder="Es. 12345" inputmode="numeric" />
-        </div>
-        <button class="btn btn-primary" onclick="enableAppLock()">Attiva Blocco (PIN / Impronta)</button>
-        <button class="btn btn-secondary" onclick="disableAppLock()" style="margin-top: 8px;">Rimuovi Blocco</button>
-      </div>
-
-      <div class="card">
-        <h2>Collegamento Google Fogli</h2>
-        <div class="input-group">
-          <label>URL Web App Google Apps Script (/exec)</label>
-          <input type="url" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" />
-        </div>
-        <div class="input-group" style="margin-top: 12px;">
-          <label>Password del Database (Token Script)</label>
-          <input type="password" id="scriptTokenInput" placeholder="Inserisci la password impostata nello script" />
-        </div>
-        <button class="btn btn-primary" onclick="saveSettings()">Salva URL e Sincronizza</button>
-      </div>
-    </section>
-  </main>
-
-  <nav>
-    <button class="active" onclick="switchView('alloc', this)"><span class="ico">🍩</span>Allocazione</button>
-    <button onclick="switchView('growth', this)"><span class="ico">📈</span>Crescita</button>
-    <button onclick="switchView('entry', this)"><span class="ico">➕</span>Aggiorna</button>
-    <button onclick="switchView('settings', this)"><span class="ico">⚙️</span>Impostazioni</button>
-  </nav>
-
-  <script>
-    const PALETTE = ['#38bdf8', '#34d399', '#fbbf24', '#a78bfa', '#f472b6', '#fb923c', '#94a3b8'];
-    let appData = { history: [], latestAssets: [], categories: [], latestMonth: '' };
-    let donutChart = null;
-    let lineChart = null;
-    let currentRange = 'ALL';
-
-    const fmtEUR = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n || 0);
-
-    // ==========================================
-    // SISTEMA DI SICUREZZA E AVVIO
-    // ==========================================
-    window.addEventListener('DOMContentLoaded', () => {
-      // 1. Gestione Blocco Schermo all'avvio
-      const savedAppPin = localStorage.getItem('app_pin');
-      const savedBioId = localStorage.getItem('app_bio_id');
-      
-      if (savedAppPin) {
-        document.getElementById('lockScreen').classList.remove('hidden');
-        if (savedBioId && window.PublicKeyCredential) {
-          document.getElementById('btnBioUnlock').style.display = 'block';
-          // Tenta lo sblocco biometrico automatico dopo 400ms
-          setTimeout(unlockWithBio, 400);
-        }
-      }
-
-      // 2. Inizializzazione dati
-      const savedUrl = localStorage.getItem('gas_url') || '';
-      const savedToken = localStorage.getItem('gas_token') || '';
-      document.getElementById('scriptUrlInput').value = savedUrl;
-      document.getElementById('scriptTokenInput').value = savedToken;
-
-      const savedEq = localStorage.getItem('target_eq') || '70';
-      document.getElementById('targetEq').value = savedEq;
-      document.getElementById('targetBond').value = 100 - parseInt(savedEq, 10);
-
-      document.getElementById('targetEq').addEventListener('input', e => {
-        const eq = Math.min(100, Math.max(0, parseInt(e.target.value || 0, 10)));
-        document.getElementById('targetBond').value = 100 - eq;
-        localStorage.setItem('target_eq', eq);
-        renderRebalance();
-      });
-
-      document.getElementById('targetBond').addEventListener('input', e => {
-        const bd = Math.min(100, Math.max(0, parseInt(e.target.value || 0, 10)));
-        document.getElementById('targetEq').value = 100 - bd;
-        localStorage.setItem('target_eq', 100 - bd);
-        renderRebalance();
-      });
-
-      const now = new Date();
-      document.getElementById('entryMonth').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-
-      if (savedUrl && savedToken) {
-        fetchFromSheet(savedUrl, savedToken);
-      } else {
-        loadDemoData();
-      }
-    });
-
-    // ==========================================
-    // FUNZIONI DI SICUREZZA (Lock Screen)
-    // ==========================================
-    async function enableAppLock() {
-      const pin = document.getElementById('setupPinInput').value.trim();
-      if (!pin) return alert("Inserisci un PIN per attivare il blocco.");
-      
-      localStorage.setItem('app_pin', pin);
-      
-      // Controllo se il browser supporta le Passkey (WebAuthn) e se siamo in contesto sicuro (HTTPS)
-      if (window.PublicKeyCredential && window.isSecureContext && window.location.hostname) {
-        if (confirm("Vuoi attivare anche lo sblocco veloce con Impronta Digitale o Viso?")) {
-          try {
-            const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-            const userId = new Uint8Array(16); window.crypto.getRandomValues(userId);
-            
-            const cred = await navigator.credentials.create({
-              publicKey: {
-                challenge,
-                rp: { name: "NetWorth Tracker", id: window.location.hostname },
-                user: { id: userId, name: "Utente", displayName: "Proprietario" },
-                pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
-                authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-                timeout: 60000
-              }
-            });
-            // Salviamo l'ID grezzo della credenziale generata dal sensore
-            const rawIdB64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
-            localStorage.setItem('app_bio_id', rawIdB64);
-            alert("Protezione attivata con successo! (PIN + Impronta)");
-          } catch (err) {
-            console.warn(err);
-            alert("Impronta non configurata (annullata o non supportata). È stato attivato solo il blocco tramite PIN.");
-          }
-        } else {
-          alert("Protezione tramite PIN attivata con successo.");
-        }
-      } else {
-        alert("Protezione tramite PIN attivata. (L'impronta richiede Chrome aggiornato e connessione sicura HTTPS).");
-      }
-      document.getElementById('setupPinInput').value = '';
-    }
-
-    function disableAppLock() {
-      localStorage.removeItem('app_pin');
-      localStorage.removeItem('app_bio_id');
-      alert("Blocco di sicurezza disattivato. L'app si aprirà liberamente.");
-    }
-
-    function unlockWithPin() {
-      const input = document.getElementById('unlockPin').value;
-      const savedPin = localStorage.getItem('app_pin');
-      if (input === savedPin) {
-        document.getElementById('lockScreen').classList.add('hidden');
-        document.getElementById('unlockPin').value = ''; // pulizia
-      } else {
-        alert("PIN errato. Riprova.");
-        document.getElementById('unlockPin').value = '';
-      }
-    }
-
-    async function unlockWithBio() {
-      const rawIdB64 = localStorage.getItem('app_bio_id');
-      if (!rawIdB64) return;
-
-      try {
-        const rawIdStr = atob(rawIdB64);
-        const rawId = new Uint8Array(rawIdStr.length);
-        for(let i = 0; i < rawIdStr.length; i++) rawId[i] = rawIdStr.charCodeAt(i);
-
-        const challenge = new Uint8Array(32); window.crypto.getRandomValues(challenge);
-
-        await navigator.credentials.get({
-          publicKey: {
-            challenge,
-            rpId: window.location.hostname,
-            allowCredentials: [{ type: "public-key", id: rawId }],
-            userVerification: "required"
-          }
-        });
-        
-        // Se arriva qui, l'impronta è corretta
-        document.getElementById('lockScreen').classList.add('hidden');
-      } catch (err) {
-        console.warn("Biometria fallita o annullata dall'utente:", err);
-        // Silenzioso in caso di annullamento, l'utente può semplicemente inserire il PIN
-      }
-    }
-
-    // ==========================================
-    // LOGICA APP (Identica a prima)
-    // ==========================================
-    function switchView(name, btn) {
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-      document.getElementById('view-' + name).classList.add('active');
-      btn.classList.add('active');
-    }
-
-    function saveSettings() {
-      const url = document.getElementById('scriptUrlInput').value.trim();
-      const token = document.getElementById('scriptTokenInput').value.trim();
-      if (!url || !token) {
-        alert('Compila sia l\'URL dello script sia la Password del Database.');
-        return;
-      }
-      localStorage.setItem('gas_url', url);
-      localStorage.setItem('gas_token', token);
-      fetchFromSheet(url, token);
-    }
-
-    async function fetchFromSheet(url, token) {
-      const badge = document.getElementById('statusBadge');
-      badge.textContent = 'Sincronizzazione...';
-      badge.style.color = '#38bdf8';
-      try {
-        const sep = url.includes('?') ? '&' : '?';
-        const res = await fetch(url + sep + 'token=' + encodeURIComponent(token));
-        const json = await res.json();
-        if (json.status !== 'ok') throw new Error(json.message);
-        appData = json;
-        badge.textContent = 'Connesso e Protetto';
-        badge.style.color = '#34d399';
-        renderAll();
-      } catch (err) {
-        badge.textContent = 'Errore Accesso';
-        badge.style.color = '#f87171';
-        alert('Errore nel caricamento dati: ' + err.message);
-      }
-    }
-
-    function loadDemoData() {
-      const badge = document.getElementById('statusBadge');
-      badge.textContent = 'Modalità Demo';
-      badge.style.color = '#38bdf8';
-      appData = {
-        latestMonth: '2026-11',
-        categories: ['Bond', 'Buoni postali', 'ETF', 'Fondi', 'Liquidità', 'Pensione integrativa'],
-        history: [
-          { month: '2026-07', total: 55200, categories: { 'ETF': 17100, 'Bond': 12000, 'Buoni postali': 4000, 'Liquidità': 14200, 'Pensione integrativa': 7900 } },
-          { month: '2026-08', total: 56400, categories: { 'ETF': 17900, 'Bond': 12100, 'Buoni postali': 4000, 'Liquidità': 14400, 'Pensione integrativa': 8000 } },
-          { month: '2026-09', total: 57800, categories: { 'ETF': 18500, 'Bond': 12300, 'Buoni postali': 4000, 'Liquidità': 14800, 'Pensione integrativa': 8200 } },
-          { month: '2026-10', total: 58900, categories: { 'ETF': 19100, 'Bond': 12500, 'Buoni postali': 4000, 'Liquidità': 15000, 'Pensione integrativa': 8300 } },
-          { month: '2026-11', total: 60000, categories: { 'ETF': 19730, 'Bond': 8600, 'Buoni postali': 4000, 'Liquidità': 19170, 'Pensione integrativa': 8500 } }
-        ],
-        latestAssets: [
-          { category: 'Liquidità', asset: 'BBVA 4%', value: 15000 },
-          { category: 'Liquidità', asset: 'Conto BP', value: 4170 },
-          { category: 'ETF', asset: 'VWCE', value: 11200 },
-          { category: 'ETF', asset: 'VALL', value: 8530 },
-          { category: 'Bond', asset: 'BTP 2029/2032', value: 8600 },
-          { category: 'Buoni postali', asset: 'Buono fruttifero', value: 4000 },
-          { category: 'Pensione integrativa', asset: 'Fondo Pensione', value: 8500 }
-        ]
-      };
-      renderAll();
-    }
-
-    function renderAll() {
-      renderAllocation();
-      renderRebalance();
-      renderGrowth();
-      renderEntryForm();
-    }
-
-    function renderAllocation() {
-      if (!appData.history.length) return;
-      const latest = appData.history[appData.history.length - 1];
-      const prev = appData.history.length > 1 ? appData.history[appData.history.length - 2] : null;
-
-      document.getElementById('latestMonthLabel').textContent = latest.month;
-      document.getElementById('totalNetWorth').textContent = fmtEUR(latest.total);
-
-      if (prev) {
-        const diff = latest.total - prev.total;
-        const pct = ((diff / prev.total) * 100).toFixed(2);
-        const sign = diff >= 0 ? '+' : '';
-        document.getElementById('momDelta').innerHTML =
-          `Vs ${prev.month}: <span class="${diff >= 0 ? 'pos' : 'neg'}">${sign}${fmtEUR(diff)} (${sign}${pct}%)</span>`;
-      }
-
-      const entries = Object.entries(latest.categories).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-      const labels = entries.map(e => e[0]);
-      const values = entries.map(e => e[1]);
-
-      if (donutChart) donutChart.destroy();
-      donutChart = new Chart(document.getElementById('donutChart'), {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data: values, backgroundColor: PALETTE, borderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '66%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmtEUR(ctx.raw)} (${((ctx.raw / latest.total) * 100).toFixed(1)}%)` } } } }
-      });
-
-      const listEl = document.getElementById('categoryBreakdown');
-      listEl.innerHTML = '';
-      entries.forEach(([cat, val], idx) => {
-        const pct = ((val / latest.total) * 100).toFixed(1);
-        const color = PALETTE[idx % PALETTE.length];
-        const assets = appData.latestAssets.filter(a => a.category === cat);
-        const wrap = document.createElement('div');
-        wrap.innerHTML = `
-          <div class="cat-item" onclick="this.nextElementSibling.classList.toggle('open')">
-            <div class="cat-left"><span class="dot" style="background:${color}"></span><strong>${cat}</strong></div>
-            <div><strong>${fmtEUR(val)}</strong> <span style="color:var(--muted);font-size:0.82rem;">(${pct}%)</span></div>
-          </div>
-          <div class="asset-drill">${assets.map(a => `<div class="asset-row"><span>${a.asset}</span><span>${fmtEUR(a.value)}</span></div>`).join('')}</div>
-        `;
-        listEl.appendChild(wrap);
-      });
-    }
-
-    function renderRebalance() {
-      if (!appData.history.length) return;
-      const latest = appData.history[appData.history.length - 1].categories;
-      const eqVal = latest['ETF'] || 0;
-      const bondVal = (latest['Bond'] || 0) + (latest['Buoni postali'] || 0) + (latest['Fondi'] || 0);
-      const invested = eqVal + bondVal;
-
-      const targetEqPct = parseFloat(document.getElementById('targetEq').value || 70) / 100;
-      const targetBondPct = parseFloat(document.getElementById('targetBond').value || 30) / 100;
-
-      const curEqPct = invested > 0 ? (eqVal / invested) * 100 : 0;
-      const curBondPct = invested > 0 ? (bondVal / invested) * 100 : 0;
-
-      const deltaEq = (targetEqPct * invested) - eqVal;
-      const deltaBond = (targetBondPct * invested) - bondVal;
-
-      document.getElementById('rebalanceTable').innerHTML = `
-        <tr><td><strong>Azionario (ETF)</strong></td><td>${curEqPct.toFixed(1)}%</td><td>${(targetEqPct * 100).toFixed(0)}%</td><td class="${deltaEq >= 0 ? 'pos' : 'neg'}">${deltaEq >= 0 ? '+' : ''}${fmtEUR(deltaEq)}</td></tr>
-        <tr><td><strong>Obbligazionario</strong></td><td>${curBondPct.toFixed(1)}%</td><td>${(targetBondPct * 100).toFixed(0)}%</td><td class="${deltaBond >= 0 ? 'pos' : 'neg'}">${deltaBond >= 0 ? '+' : ''}${fmtEUR(deltaBond)}</td></tr>
-      `;
-    }
-
-    function setRange(range, btn) {
-      currentRange = range;
-      document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderGrowth();
-    }
-
-    function renderGrowth() {
-      let slice = appData.history;
-      if (currentRange !== 'ALL') slice = slice.slice(-parseInt(currentRange, 10));
-
-      const labels = slice.map(h => h.month);
-      const datasets = [{ label: 'Totale', data: slice.map(h => h.total), borderColor: '#f8fafc', backgroundColor: 'rgba(248,250,252,0.08)', borderWidth: 2.5, tension: 0.25 }];
-
-      appData.categories.forEach((cat, idx) => {
-        datasets.push({ label: cat, data: slice.map(h => h.categories[cat] || 0), borderColor: PALETTE[idx % PALETTE.length], borderWidth: 1.8, tension: 0.25, hidden: false });
-      });
-
-      if (lineChart) lineChart.destroy();
-      lineChart = new Chart(document.getElementById('lineChart'), {
-        type: 'line', data: { labels, datasets },
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
-      });
-
-      const tbody = document.getElementById('historyTable');
-      tbody.innerHTML = [...slice].reverse().map(h => {
-        const c = h.categories;
-        const bondSum = (c['Bond'] || 0) + (c['Buoni postali'] || 0) + (c['Fondi'] || 0);
-        return `<tr><td><strong>${h.month}</strong></td><td>${fmtEUR(c['ETF'] || 0)}</td><td>${fmtEUR(bondSum)}</td><td>${fmtEUR(c['Liquidità'] || 0)}</td><td>${fmtEUR(c['Pensione integrativa'] || 0)}</td><td><strong>${fmtEUR(h.total)}</strong></td></tr>`;
-      }).join('');
-    }
-
-    function renderEntryForm() {
-      const container = document.getElementById('entryRows');
-      container.innerHTML = '';
-      appData.latestAssets.forEach(item => addEntryRow(item.category, item.asset, item.value));
-      updateEntryPreview();
-    }
-
-    function addEntryRow(cat = 'ETF', asset = '', val = '') {
-      const container = document.getElementById('entryRows');
-      const div = document.createElement('div');
-      div.className = 'entry-row';
-      const opts = Array.from(new Set([...appData.categories, 'Bond', 'Buoni postali', 'ETF', 'Fondi', 'Liquidità', 'Pensione integrativa', 'Fondo emergenza']))
-        .map(c => `<option value="${c}" ${c === cat ? 'selected' : ''}>${c}</option>`).join('');
-
-      div.innerHTML = `<select class="in-cat">${opts}</select><input type="text" class="in-asset" placeholder="Nome asset" value="${asset}" /><input type="number" step="0.01" class="in-val" placeholder="0.00" value="${val}" oninput="updateEntryPreview()" /><button class="btn-del" onclick="this.parentElement.remove(); updateEntryPreview();">×</button>`;
-      container.appendChild(div);
-    }
-
-    function updateEntryPreview() {
-      let sum = 0;
-      document.querySelectorAll('.in-val').forEach(inp => {
-        const v = parseFloat(inp.value);
-        if (!isNaN(v)) sum += v;
-      });
-      document.getElementById('entryPreviewTotal').textContent = fmtEUR(sum);
-    }
-
-    async function saveMonthToSheet() {
-      const url = localStorage.getItem('gas_url');
-      const token = localStorage.getItem('gas_token');
-      if (!url || !token) return alert('Inserisci sia l\'URL dello script sia la Password nella scheda "Impostazioni".');
-      
       const month = document.getElementById('entryMonth').value;
       const items = [];
       document.querySelectorAll('.entry-row').forEach(row => {
