@@ -93,7 +93,10 @@
     <!-- VISTA 1: ALLOCAZIONE & TARGET -->
     <section id="view-alloc" class="view active">
       <div class="card">
-        <h2>Patrimonio Totale (<span id="latestMonthLabel">-</span>)</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h2 style="margin:0;">Patrimonio Totale (<span id="latestMonthLabel">-</span>)</h2>
+          <button id="toggleObscureBtn" onclick="toggleObscure()" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; padding: 0;">👁️</button>
+        </div>
         <div class="kpi-big" id="totalNetWorth">€ 0,00</div>
         <div class="kpi-sub" id="momDelta">Variazione mese precedente: -</div>
         <div class="chart-box" style="margin-top:14px;"><canvas id="donutChart"></canvas></div>
@@ -200,10 +203,28 @@
     let donutChart = null;
     let lineChart = null;
     let currentRange = 'ALL';
+    
+    // Variabile di stato per l'oscuramento importi (salvata in locale)
+    let isObscured = localStorage.getItem('is_obscured') === 'true';
 
-    const fmtEUR = n => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n || 0);
+    // Funzione modificata: se isObscured è true, formatta come asterischi
+    const fmtEUR = n => {
+      if (isObscured) return '€ ***,**';
+      return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n || 0);
+    };
+
+    // Funzione chiamata al clic sull'occhio
+    function toggleObscure() {
+      isObscured = !isObscured;
+      localStorage.setItem('is_obscured', isObscured);
+      document.getElementById('toggleObscureBtn').textContent = isObscured ? '🙈' : '👁️';
+      if (appData.history.length) renderAll();
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
+      // Inizializza icona occhio
+      document.getElementById('toggleObscureBtn').textContent = isObscured ? '🙈' : '👁️';
+
       const savedAppPin = localStorage.getItem('app_pin');
       const savedBioId = localStorage.getItem('app_bio_id');
 
@@ -506,7 +527,17 @@
       if (lineChart) lineChart.destroy();
       lineChart = new Chart(document.getElementById('lineChart'), {
         type: 'line', data: { labels, datasets },
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } } } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+        options: { 
+          responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, 
+          plugins: { 
+            legend: { labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtEUR(ctx.raw)}` } }
+          }, 
+          scales: { 
+            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } }, 
+            y: { ticks: { color: '#94a3b8', callback: val => isObscured ? '***' : val }, grid: { color: 'rgba(255,255,255,0.05)' } } 
+          } 
+        }
       });
 
       const tbody = document.getElementById('historyTable');
