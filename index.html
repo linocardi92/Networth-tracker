@@ -501,7 +501,7 @@
     function renderRebalance() {
       if (!appData.history.length) return;
       const latest = appData.history[appData.history.length - 1].categories;
-      const eqVal = latest['ETF'] || 0;
+      const eqVal = latest['ETF Azionari'] || 0;
       const bondVal = (latest['Bond'] || 0) + (latest['Buoni postali'] || 0) + (latest['Fondi'] || 0);
       const invested = eqVal + bondVal;
 
@@ -558,7 +558,7 @@
       tbody.innerHTML = [...slice].reverse().map(h => {
         const c = h.categories;
         const bondSum = (c['Bond'] || 0) + (c['Buoni postali'] || 0) + (c['Fondi'] || 0);
-        return `<tr><td><strong>${h.month}</strong></td><td>${fmtEUR(c['ETF'] || 0)}</td><td>${fmtEUR(bondSum)}</td><td>${fmtEUR(c['Liquidità'] || 0)}</td><td>${fmtEUR(c['Pensione integrativa'] || 0)}</td><td><strong>${fmtEUR(h.total)}</strong></td></tr>`;
+        return `<tr><td><strong>${h.month}</strong></td><td>${fmtEUR(c['ETF Azionari'] || 0)}</td><td>${fmtEUR(bondSum)}</td><td>${fmtEUR(c['Liquidità'] || 0)}</td><td>${fmtEUR(c['Pensione integrativa'] || 0)}</td><td><strong>${fmtEUR(h.total)}</strong></td></tr>`;
       }).join('');
     }
 
