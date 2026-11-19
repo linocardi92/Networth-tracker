@@ -116,7 +116,7 @@
         <h2>Ribilanciamento Portafoglio Investito</h2>
         <div class="rebal-controls">
           <div class="input-group">
-            <label>Target Azionario (ETF) %</label>
+            <label>Target Azionario (ETF Azionari) %</label>
             <input type="number" id="targetEq" min="0" max="100" step="1" value="70" />
           </div>
           <div class="input-group">
@@ -146,7 +146,7 @@
       <div class="card" style="overflow-x:auto;">
         <h2>Storico Mensile Aggregato</h2>
         <table>
-          <thead><tr><th>Mese</th><th>ETF</th><th>Bond/Buoni/Fondi</th><th>Liquidità</th><th>Pensione</th><th>Totale</th></tr></thead>
+          <thead><tr><th>Mese</th><th>ETF Azionari</th><th>Bond/Buoni/Fondi</th><th>Liquidità</th><th>Pensione</th><th>Totale</th></tr></thead>
           <tbody id="historyTable"></tbody>
         </table>
       </div>
@@ -425,19 +425,19 @@
       badge.style.color = '#38bdf8';
       appData = {
         latestMonth: '2026-11',
-        categories: ['Bond', 'Buoni postali', 'ETF', 'Fondi', 'Liquidità', 'Pensione integrativa'],
+        categories: ['Bond', 'Buoni postali', 'ETF Azionari', 'Fondi', 'Liquidità', 'Pensione integrativa'],
         history: [
-          { month: '2026-07', total: 55200, categories: { 'ETF': 17100, 'Bond': 12000, 'Buoni postali': 4000, 'Liquidità': 14200, 'Pensione integrativa': 7900 } },
-          { month: '2026-08', total: 56400, categories: { 'ETF': 17900, 'Bond': 12100, 'Buoni postali': 4000, 'Liquidità': 14400, 'Pensione integrativa': 8000 } },
-          { month: '2026-09', total: 57800, categories: { 'ETF': 18500, 'Bond': 12300, 'Buoni postali': 4000, 'Liquidità': 14800, 'Pensione integrativa': 8200 } },
-          { month: '2026-10', total: 58900, categories: { 'ETF': 19100, 'Bond': 12500, 'Buoni postali': 4000, 'Liquidità': 15000, 'Pensione integrativa': 8300 } },
-          { month: '2026-11', total: 60000, categories: { 'ETF': 19730, 'Bond': 8600, 'Buoni postali': 4000, 'Liquidità': 19170, 'Pensione integrativa': 8500 } }
+          { month: '2026-07', total: 55200, categories: { 'ETF Azionari': 17100, 'Bond': 12000, 'Buoni postali': 4000, 'Liquidità': 14200, 'Pensione integrativa': 7900 } },
+          { month: '2026-08', total: 56400, categories: { 'ETF Azionari': 17900, 'Bond': 12100, 'Buoni postali': 4000, 'Liquidità': 14400, 'Pensione integrativa': 8000 } },
+          { month: '2026-09', total: 57800, categories: { 'ETF Azionari': 18500, 'Bond': 12300, 'Buoni postali': 4000, 'Liquidità': 14800, 'Pensione integrativa': 8200 } },
+          { month: '2026-10', total: 58900, categories: { 'ETF Azionari': 19100, 'Bond': 12500, 'Buoni postali': 4000, 'Liquidità': 15000, 'Pensione integrativa': 8300 } },
+          { month: '2026-11', total: 60000, categories: { 'ETF Azionari': 19730, 'Bond': 8600, 'Buoni postali': 4000, 'Liquidità': 19170, 'Pensione integrativa': 8500 } }
         ],
         latestAssets: [
           { category: 'Liquidità', asset: 'BBVA 4%', value: 15000 },
           { category: 'Liquidità', asset: 'Conto BP', value: 4170 },
-          { category: 'ETF', asset: 'VWCE', value: 11200 },
-          { category: 'ETF', asset: 'VALL', value: 8530 },
+          { category: 'ETF Azionari', asset: 'VWCE', value: 11200 },
+          { category: 'ETF Azionari', asset: 'VALL', value: 8530 },
           { category: 'Bond', asset: 'BTP 2029/2032', value: 8600 },
           { category: 'Buoni postali', asset: 'Buono fruttifero', value: 4000 },
           { category: 'Pensione integrativa', asset: 'Fondo Pensione', value: 8500 }
@@ -515,7 +515,7 @@
       const deltaBond = (targetBondPct * invested) - bondVal;
 
       document.getElementById('rebalanceTable').innerHTML = `
-        <tr><td><strong>Azionario (ETF)</strong></td><td>${curEqPct.toFixed(1)}%</td><td>${(targetEqPct * 100).toFixed(0)}%</td><td class="${deltaEq >= 0 ? 'pos' : 'neg'}">${deltaEq >= 0 ? '+' : ''}${fmtEUR(deltaEq)}</td></tr>
+        <tr><td><strong>Azionario (ETF Azionari)</strong></td><td>${curEqPct.toFixed(1)}%</td><td>${(targetEqPct * 100).toFixed(0)}%</td><td class="${deltaEq >= 0 ? 'pos' : 'neg'}">${deltaEq >= 0 ? '+' : ''}${fmtEUR(deltaEq)}</td></tr>
         <tr><td><strong>Obbligazionario</strong></td><td>${curBondPct.toFixed(1)}%</td><td>${(targetBondPct * 100).toFixed(0)}%</td><td class="${deltaBond >= 0 ? 'pos' : 'neg'}">${deltaBond >= 0 ? '+' : ''}${fmtEUR(deltaBond)}</td></tr>
       `;
     }
@@ -569,11 +569,11 @@
       updateEntryPreview();
     }
 
-    function addEntryRow(cat = 'ETF', asset = '', val = '') {
+    function addEntryRow(cat = 'ETF Azionari', asset = '', val = '') {
       const container = document.getElementById('entryRows');
       const div = document.createElement('div');
       div.className = 'entry-row';
-      const opts = Array.from(new Set([...appData.categories, 'Bond', 'Buoni postali', 'ETF', 'Fondi', 'Liquidità', 'Pensione integrativa', 'Fondo emergenza']))
+      const opts = Array.from(new Set([...appData.categories, 'Bond', 'Buoni postali', 'ETF Azionari', 'Fondi', 'Liquidità', 'Pensione integrativa', 'Fondo emergenza']))
         .map(c => `<option value="${c}" ${c === cat ? 'selected' : ''}>${c}</option>`).join('');
 
       div.innerHTML = `<select class="in-cat">${opts}</select><input type="text" class="in-asset" placeholder="Nome asset" value="${asset}" /><input type="number" step="0.01" class="in-val" placeholder="0.00" value="${val}" oninput="updateEntryPreview()" /><button class="btn-del" onclick="this.parentElement.remove(); updateEntryPreview();">×</button>`;
